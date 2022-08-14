@@ -2,6 +2,7 @@ import org.junit.jupiter.api.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -129,8 +130,8 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
                 Flux<Task> taskFlux = taskQueue().flatMap(task -> {
                         return task.execute()
                                         .then(task.commit())
-                                        .thenReturn(task)
-                                        .onErrorResume(err -> task.rollback(err).thenReturn(task));
+                                        .onErrorResume(task::rollback)
+                                        .thenReturn(task);
                 })
                 // todo: do your changes here
                 ;
@@ -152,6 +153,8 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
         public void billion_dollar_mistake() {
                 Flux<String> content = getFilesContent()
                                 .flatMap(Function.identity())
+                                .onErrorContinue((err, file) -> {
+                                });
                 // todo: change this line only
                 ;
 
@@ -184,7 +187,9 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
         public void resilience() {
                 // todo: change code as you need
                 Flux<String> content = getFilesContent()
-                                .flatMap(Function.identity()); // start from here
+                                .flatMap(file -> {
+                                        return file.onErrorResume(err -> Mono.empty());
+                                }); // start from here
 
                 // don't change below this line
                 StepVerifier.create(content)
@@ -200,7 +205,7 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
          */
         @Test
         public void its_hot_in_here() {
-                Mono<Integer> temperature = temperatureSensor()
+                Mono<Integer> temperature = temperatureSensor().retry()
                 // todo: change this line only
                 ;
 
@@ -219,6 +224,7 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
         @Test
         public void back_off() {
                 Mono<String> connection_result = establishConnection()
+                                .retryWhen(Retry.backoff(3, Duration.ofSeconds(5)))
                 // todo: change this line only
                 ;
 
@@ -237,7 +243,9 @@ public class c7_ErrorHandling extends ErrorHandlingBase {
         @Test
         public void good_old_polling() {
                 // todo: change code as you need
-                Flux<String> alerts = null;
+                Flux<String> alerts = nodeAlerts().repeatWhen(el->{
+                        return el;
+                });
                 nodeAlerts();
 
                 // don't change below this line
